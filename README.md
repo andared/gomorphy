@@ -13,9 +13,13 @@ pymorphy3 port for golang
 
 Добавление пакета:
 ```
-go get github.com/AlexMaxy/gomorphy
+go get github.com/andared/gomorphy
 ```
 Скопируйте каталог словаря opencorpora из пакета gomorphy в папку со своим проектом.
+
+`GetMorphInstance` кэширует анализатор по пути к словарю. Если приложению нужны
+независимые экземпляры (например, для нескольких версий словаря), создайте их
+через `NewMorphAnalyzer`.
 
 ### Пример:
 ```
@@ -25,7 +29,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/AlexMaxy/gomorphy"
+	"github.com/andared/gomorphy"
 )
 
 func main() {

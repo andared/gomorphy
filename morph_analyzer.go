@@ -11,19 +11,41 @@ import (
 )
 
 var (
-	morphAnalyzer *MorphAnalyzer
-	morphOnce     sync.Once
-	morphErr      error
+	morphInstancesMu sync.Mutex
+	morphInstances   = make(map[string]*MorphAnalyzer)
 )
 
-// Default returns the shared Analyzer loaded from embedded dictionary data
-// The dictionary is initialised on the first call and cached; subsequent calls
-// return the same instance. Safe for concurrent use
+// NewMorphAnalyzer загружает независимый экземпляр анализатора из каталога
+// со словарём OpenCorpora.
+//
+// Экземпляр можно безопасно использовать из нескольких горутин. Для повторного
+// использования одного экземпляра с кэшем используйте GetMorphInstance.
+func NewMorphAnalyzer(opencorporaPath string) (*MorphAnalyzer, error) {
+	return newMorphAnalyzer(opencorporaPath)
+}
+
+// GetMorphInstance возвращает кэшированный экземпляр анализатора для каталога
+// со словарём. Кэш разделён по абсолютному пути, поэтому ошибка загрузки одного
+// каталога не блокирует загрузку другого.
 func GetMorphInstance(opencorporaPath string) (*MorphAnalyzer, error) {
-	morphOnce.Do(func() {
-		morphAnalyzer, morphErr = initMorphAnalyzer(opencorporaPath)
-	})
-	return morphAnalyzer, morphErr
+	path, err := filepath.Abs(opencorporaPath)
+	if err != nil {
+		return nil, err
+	}
+
+	morphInstancesMu.Lock()
+	defer morphInstancesMu.Unlock()
+
+	if morph, ok := morphInstances[path]; ok {
+		return morph, nil
+	}
+
+	morph, err := newMorphAnalyzer(path)
+	if err != nil {
+		return nil, err
+	}
+	morphInstances[path] = morph
+	return morph, nil
 }
 
 type compiledReplaces struct {
@@ -40,9 +62,7 @@ type MorphAnalyzer struct {
 	*tagClass
 }
 
-// НЕ использовать как самостоятельный конструктор.
-// Там внутри завязки на глобальную переменную morphAnalyzer.
-func initMorphAnalyzer(opencorporaPath string) (*MorphAnalyzer, error) {
+func newMorphAnalyzer(opencorporaPath string) (*MorphAnalyzer, error) {
 	a := &MorphAnalyzer{
 		analyzers: make([]analyzer, 0, 14),
 		charSubstitutes: map[rune]compiledReplaces{'е': {
@@ -70,6 +90,10 @@ func initMorphAnalyzer(opencorporaPath string) (*MorphAnalyzer, error) {
 
 	if a.predSuffixes, err = newPredictionSuffixesDawgs(opencorporaPath); err != nil {
 		return nil, err
+	}
+	a.words.charSubstitutes = a.charSubstitutes
+	for _, dawg := range a.predSuffixes.predictSfxDawgs {
+		dawg.charSubstitutes = a.charSubstitutes
 	}
 
 	// paradigms.array: uint16 LE count, then per paradigm: uint16 LE length + data
@@ -112,22 +136,30 @@ func initMorphAnalyzer(opencorporaPath string) (*MorphAnalyzer, error) {
 	// _Unit(analyzer=KnownSuffixAnalyzer(min_word_length=4, score_multiplier=0.5), terminal=True)
 	// _Unit(analyzer=UnknAnalyzer(), terminal=True)
 
-	a.addAnalyzer(newDictionaryAnalyzer(&a.words))      // 0
-	a.addAnalyzer(newAbbreviatedFirstNameAnalyzer())    // 1
-	a.addAnalyzer(newAbbreviatedPatronymicAnalyzer())   // 2
-	a.addAnalyzer(newNumberAnalyzer())                  // 3
-	a.addAnalyzer(newPunctuationAnalyzer())             // 4
-	a.addAnalyzer(newRomanNumberAnalyzer())             // 5
-	a.addAnalyzer(newLatinAnalyzer())                   // 6
-	a.addAnalyzer(newHyphenSeparatedParticleAnalyzer()) // 7
-	a.addAnalyzer(newHyphenAdverbAnalyzer())            // 8
-	a.addAnalyzer(newHyphenatedWordsAnalyzer())         // 9
-	a.addAnalyzer(newKnownPrefixAnalyzer())             // 10
-	a.addAnalyzer(newUnknownPrefixAnalyzer())           // 11
-	a.addAnalyzer(newKnownSuffixAnalyzer(&a.words))     // 12
-	a.addAnalyzer(newUnknAnalyzer())                    // 13
+	a.addAnalyzer(newDictionaryAnalyzer(&a.words))       // 0
+	a.addAnalyzer(newAbbreviatedFirstNameAnalyzer())     // 1
+	a.addAnalyzer(newAbbreviatedPatronymicAnalyzer())    // 2
+	a.addAnalyzer(newNumberAnalyzer())                   // 3
+	a.addAnalyzer(newPunctuationAnalyzer())              // 4
+	a.addAnalyzer(newRomanNumberAnalyzer())              // 5
+	a.addAnalyzer(newLatinAnalyzer())                    // 6
+	a.addAnalyzer(newHyphenSeparatedParticleAnalyzer(a)) // 7
+	a.addAnalyzer(newHyphenAdverbAnalyzer(a))            // 8
+	a.addAnalyzer(newHyphenatedWordsAnalyzer(a))         // 9
+	a.addAnalyzer(newKnownPrefixAnalyzer(a))             // 10
+	a.addAnalyzer(newUnknownPrefixAnalyzer(a))           // 11
+	a.addAnalyzer(newKnownSuffixAnalyzer(a, &a.words))   // 12
+	a.addAnalyzer(newUnknAnalyzer())                     // 13
 
 	return a, nil
+}
+
+func (m *MorphAnalyzer) bindParses(parses []*Parse) {
+	for _, parse := range parses {
+		if parse != nil {
+			parse.morph = m
+		}
+	}
 }
 
 func (m *MorphAnalyzer) loadParadigms(raw []byte) error {
