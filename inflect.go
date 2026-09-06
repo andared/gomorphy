@@ -11,6 +11,12 @@ import (
 //
 // Есть вспомогательный метод InflectVar() с вариадическими аргументами.
 func (p *Parse) Inflect(requiredGrammemes []string) (*Parse, error) {
+	if p == nil {
+		return nil, fmt.Errorf("parse равен nil")
+	}
+	if p.morph == nil {
+		return nil, fmt.Errorf("parse не связан с MorphAnalyzer")
+	}
 	if p.Tag.Contains("UNKN") {
 		return nil, nil
 	}
@@ -21,7 +27,7 @@ func (p *Parse) Inflect(requiredGrammemes []string) (*Parse, error) {
 		}
 		reqGrammemesSet[grammeme] = true
 	}
-	return morphAnalyzer.inflect(p, reqGrammemesSet)
+	return p.morph.inflect(p, reqGrammemesSet)
 }
 
 // тоже самое что и Inflect, только с вариадическими аргументами.
@@ -34,7 +40,9 @@ func (p *Parse) InflectVar(requiredGrammemes ...string) (*Parse, error) {
 // Return the lexeme this parse belongs to.
 func (m *MorphAnalyzer) getLexeme(form *Parse) []*Parse {
 	lastMethod := form.MethodsStack[len(form.MethodsStack)-1]
-	return lastMethod.Analyzer.getLexeme(form)
+	lexeme := lastMethod.Analyzer.getLexeme(form)
+	m.bindParses(lexeme)
+	return lexeme
 }
 
 func (m *MorphAnalyzer) inflect(form *Parse, requiredGrammemes map[string]bool) (*Parse, error) {

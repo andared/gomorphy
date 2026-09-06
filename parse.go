@@ -19,6 +19,7 @@ type Parse struct {
 	NormalForm   string
 	Score        float32
 	MethodsStack []Method
+	morph        *MorphAnalyzer
 }
 
 func newParse(word string, tag string, score float32) *Parse {
@@ -55,6 +56,7 @@ func (m *MorphAnalyzer) Parse(word string) []*Parse {
 
 	// расчет score
 	m.applyToParses(word, wordLower, res)
+	m.bindParses(res)
 	return res
 }
 
@@ -66,23 +68,39 @@ func (*MorphAnalyzer) IsParsed(parses []*Parse) bool {
 
 // MakeAgreeWithNumber склоненяет слово в соответствии с числом num ('дом'(5) -> 'домов')
 func (p *Parse) MakeAgreeWithNumber(num int) *Parse {
+	if p == nil {
+		return nil
+	}
 	res, _ := p.Inflect(p.Tag.numeralAgreementGrammemes(num))
 	return res
 }
 
 // Lexeme возвращает лексемы, принадлежащие этой форме
 func (p *Parse) Lexeme() []*Parse {
-	return morphAnalyzer.getLexeme(p)
+	if p == nil || p.morph == nil {
+		return nil
+	}
+	return p.morph.getLexeme(p)
 }
 
 // Normalized возвращает объект Parse нормальной формы слова.
 func (p *Parse) Normalized() *Parse {
-	return p.MethodsStack[len(p.MethodsStack)-1].Analyzer.normalized(p)
+	if p == nil || len(p.MethodsStack) == 0 {
+		return nil
+	}
+	normalized := p.MethodsStack[len(p.MethodsStack)-1].Analyzer.normalized(p)
+	if normalized != nil {
+		normalized.morph = p.morph
+	}
+	return normalized
 }
 
 // True if this form is a known dictionary form.
 func (p *Parse) IsKnown() bool {
-	return morphAnalyzer.words.wordIsKnown(p.Word, morphAnalyzer.charSubstitutes)
+	if p == nil || p.morph == nil {
+		return false
+	}
+	return p.morph.words.wordIsKnown(p.Word, p.morph.charSubstitutes)
 }
 
 func (m *MorphAnalyzer) applyToParses(word string, wordLower string, parses []*Parse) {
