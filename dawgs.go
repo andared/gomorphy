@@ -121,10 +121,11 @@ type formParadigm struct {
 }
 
 type wordsDawg struct {
-	dict           *dictionary
-	guide          *guide
-	isPredSuffix   bool
-	dawgPayloadSep byte // BytesDAWG payload separator byte
+	dict            *dictionary
+	guide           *guide
+	isPredSuffix    bool
+	dawgPayloadSep  byte // BytesDAWG payload separator byte
+	charSubstitutes map[rune]compiledReplaces
 }
 
 // load reads a words.dawg file from r.
@@ -213,7 +214,7 @@ func (w *wordsDawg) getSimilarItems(
 	loopIsBreaked := false
 	for wordPos < endPos {
 		bStep, _ := runeAt(key, wordPos)
-		replaceChars, ok := morphAnalyzer.charSubstitutes[bStep]
+		replaceChars, ok := w.charSubstitutes[bStep]
 		if ok {
 			nextIndex := index
 			if nextIndex, ok = w.dict.followBytes(replaceChars.bReplaceChar, nextIndex); ok {
@@ -265,7 +266,7 @@ func (w *wordsDawg) getSimilarItemValues(
 	loopIsBreaked := false
 	for wordPos < endPos {
 		bStep, _ := runeAt(key, wordPos)
-		replaceChars, ok := morphAnalyzer.charSubstitutes[bStep]
+		replaceChars, ok := w.charSubstitutes[bStep]
 		if ok {
 			nextIndex := index
 			if nextIndex, ok = w.dict.followBytes(replaceChars.bReplaceChar, nextIndex); ok {

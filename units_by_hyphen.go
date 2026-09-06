@@ -24,6 +24,7 @@ import (
 //	so for normalization you may need to handle
 //	particles at tokenization level.
 type hyphenSeparatedParticleAnalyzer struct {
+	morph                *MorphAnalyzer
 	name                 string
 	terminal             bool
 	scoreMultiplier      float32
@@ -31,8 +32,9 @@ type hyphenSeparatedParticleAnalyzer struct {
 	*analogyAnalyzerUnit
 }
 
-func newHyphenSeparatedParticleAnalyzer() *hyphenSeparatedParticleAnalyzer {
+func newHyphenSeparatedParticleAnalyzer(morph *MorphAnalyzer) *hyphenSeparatedParticleAnalyzer {
 	return &hyphenSeparatedParticleAnalyzer{
+		morph:                morph,
 		name:                 "HyphenSeparatedParticleAnalyzer",
 		terminal:             true,
 		scoreMultiplier:      0.9,
@@ -54,7 +56,7 @@ func (self *hyphenSeparatedParticleAnalyzer) parse(word string, wordLower string
 	var result []*Parse
 	for _, split := range self.possibleSplits(wordLower) {
 		method := Method{Analyzer: self, WordOrStack: split.suffix}
-		for _, p := range morphAnalyzer.Parse(split.unsuffixedWord) {
+		for _, p := range self.morph.Parse(split.unsuffixedWord) {
 			parse := newParse(
 				p.Word+split.suffix,
 				p.Tag.RawTagsString,
@@ -79,7 +81,7 @@ func (self *hyphenSeparatedParticleAnalyzer) parse(word string, wordLower string
 func (self *hyphenSeparatedParticleAnalyzer) tag(word, wordLower string, seenTags map[string]bool) []*opencorporaTag {
 	result := make([]*opencorporaTag, 0, 10)
 	for _, split := range self.possibleSplits(wordLower) {
-		result = append(result, morphAnalyzer.Tag(split.unsuffixedWord)...)
+		result = append(result, self.morph.Tag(split.unsuffixedWord)...)
 
 		// # If a word ends with with one of the particles,
 		// # it can't ends with an another.
@@ -143,14 +145,16 @@ func (self *hyphenSeparatedParticleAnalyzer) normalized(form *Parse) *Parse {
 //
 //	Example: по-западному
 type hyphenAdverbAnalyzer struct {
+	morph           *MorphAnalyzer
 	name            string
 	selfTag         string
 	terminal        bool
 	scoreMultiplier float32
 }
 
-func newHyphenAdverbAnalyzer() *hyphenAdverbAnalyzer {
+func newHyphenAdverbAnalyzer(morph *MorphAnalyzer) *hyphenAdverbAnalyzer {
 	return &hyphenAdverbAnalyzer{
+		morph:           morph,
 		name:            "HyphenAdverbAnalyzer",
 		selfTag:         "ADVB",
 		terminal:        true,
@@ -198,7 +202,7 @@ func (self *hyphenAdverbAnalyzer) shouldParse(word string) bool {
 	}
 
 	if w, ok := strings.CutPrefix(word, "по-"); ok {
-		for _, tag := range morphAnalyzer.Tag(w) {
+		for _, tag := range self.morph.Tag(w) {
 			if tag.Contains("ADJF") && tag.Contains("sing") && tag.Contains("datv") {
 				return true
 			}
@@ -224,6 +228,7 @@ func (self *hyphenAdverbAnalyzer) normalized(form *Parse) *Parse {
 //	    * интернет-магазин -> "интернет-" + магазин
 //	    * человек-гора -> человек + гора
 type hyphenatedWordsAnalyzer struct {
+	morph            *MorphAnalyzer
 	name             string
 	terminal         bool
 	scoreMultiplier  float32
@@ -233,8 +238,9 @@ type hyphenatedWordsAnalyzer struct {
 	*prefixMatcher
 }
 
-func newHyphenatedWordsAnalyzer() *hyphenatedWordsAnalyzer {
+func newHyphenatedWordsAnalyzer(morph *MorphAnalyzer) *hyphenatedWordsAnalyzer {
 	a := &hyphenatedWordsAnalyzer{
+		morph:           morph,
 		name:            "HyphenatedWordsAnalyzer",
 		terminal:        true,
 		scoreMultiplier: 0.75,
@@ -281,8 +287,8 @@ func (self *hyphenatedWordsAnalyzer) parse(word string, wordLower string, seenPa
 		return nil
 	}
 	left, right := wSplit[0], wSplit[1]
-	leftParses := morphAnalyzer.Parse(left)
-	rightParses := morphAnalyzer.Parse(right)
+	leftParses := self.morph.Parse(left)
+	rightParses := self.morph.Parse(right)
 
 	result := self.parseAsVariableBoth(leftParses, rightParses)
 
