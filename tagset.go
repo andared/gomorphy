@@ -4,14 +4,11 @@ import (
 	"fmt"
 	"maps"
 	"strings"
-	"sync"
 )
 
 type opencorporaTag struct {
 	prob           float32 // для applyToTags() и knownSuffixAnalyzer.tag()
 	tags           map[string]bool
-	grammemesCache map[string]bool // рабочая копия tags
-	cacheMu        sync.RWMutex
 	grammemesTuple []string
 	POS            string
 	Case           string
@@ -99,22 +96,9 @@ func (o *opencorporaTag) numeralAgreementGrammemes(num int) []string {
 }
 
 func (o *opencorporaTag) grammemes() map[string]bool {
-	o.cacheMu.RLock()
-	if o.grammemesCache != nil {
-		grammemes := maps.Clone(o.grammemesCache)
-		o.cacheMu.RUnlock()
-		return grammemes
-	}
-	o.cacheMu.RUnlock()
-
-	o.cacheMu.Lock()
-	defer o.cacheMu.Unlock()
-	if o.grammemesCache == nil {
-		// Tags are shared between parses and goroutines, so the cache is never
-		// handed out: every caller gets its own copy to modify.
-		o.grammemesCache = maps.Clone(o.tags)
-	}
-	return maps.Clone(o.grammemesCache)
+	// Callers modify the result in place, and tags are shared between parses
+	// and goroutines, so every call gets its own copy.
+	return maps.Clone(o.tags)
 }
 
 // Return a new set of grammemes with “required“ grammemes added and incompatible grammemes removed.
