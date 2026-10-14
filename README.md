@@ -1,15 +1,32 @@
 # gomorphy
-pymorphy3 port for golang
 
-Частичный порт библиотеки python https://github.com/no-plagiarism/pymorphy3 на язык Golang
+An experimental fork of [AlexMaxy/gomorphy](https://github.com/AlexMaxy/gomorphy) for Russian
+morphological analysis and inflection in Go. The upstream project is a partial port of
+[pymorphy3](https://github.com/no-plagiarism/pymorphy3), with DAWG dictionary-reading code
+derived from [jus1d/gomorphy](https://github.com/jus1d/gomorphy).
 
-Реализована поддержка только русского языка (украинский в планах на будущее).
+## Why this fork
 
-Частичный форк https://github.com/jus1d/gomorphy . (За основу взят код работы со словарем DAWG.)
+Use this fork when an application needs independently owned analyzer instances or needs to
+load more than one dictionary without sharing a hidden global analyzer. Its current changes are:
 
-Работа со словарем opencorpora в формате DAWG (словарь от 22.05.2026).
+- `NewMorphAnalyzer` creates independent instances.
+- `GetMorphInstance` caches instances by dictionary path; a failed load does not poison another path.
+- Parse results retain their owning analyzer for inflection, lexeme, and known-word operations.
+- Grammeme caching is synchronized and returns copies, with lifecycle and concurrent inflection tests.
 
-Реализованы все эвристические анализаторы.
+## Status and compatibility
+
+**Experimental; no tagged release yet.** The public API and behavior may change.
+Only Russian is supported. The bundled OpenCorpora DAWG dictionary is dated 2026-05-22.
+Complete output parity with pymorphy2 or pymorphy3 has not been established; dictionary and
+algorithm differences need separate comparison. The current tests cover specific lifecycle
+and concurrency scenarios, not every concurrent use of the API.
+
+Dictionary setup still requires copying the `opencorpora` directory as described below.
+See [ROADMAP.md](ROADMAP.md) for compatibility testing, CI, and dictionary distribution plans.
+
+## Installation and example
 
 Добавление пакета:
 ```
