@@ -100,27 +100,21 @@ func (o *opencorporaTag) numeralAgreementGrammemes(num int) []string {
 
 func (o *opencorporaTag) grammemes() map[string]bool {
 	o.cacheMu.RLock()
-	cache := o.grammemesCache
-	if cache != nil {
-		grammemes := make(map[string]bool, len(cache))
-		maps.Copy(grammemes, cache)
+	if o.grammemesCache != nil {
+		grammemes := maps.Clone(o.grammemesCache)
 		o.cacheMu.RUnlock()
 		return grammemes
 	}
 	o.cacheMu.RUnlock()
 
 	o.cacheMu.Lock()
+	defer o.cacheMu.Unlock()
 	if o.grammemesCache == nil {
-		// Кэш — неизменяемая копия tags. Каждый вызов возвращает свою копию,
-		// чтобы эвристические анализаторы не меняли состояние Parse и не
-		// сталкивались друг с другом при работе из разных горутин.
-		o.grammemesCache = make(map[string]bool, len(o.tags))
-		maps.Copy(o.grammemesCache, o.tags)
+		// Tags are shared between parses and goroutines, so the cache is never
+		// handed out: every caller gets its own copy to modify.
+		o.grammemesCache = maps.Clone(o.tags)
 	}
-	grammemes := make(map[string]bool, len(o.grammemesCache))
-	maps.Copy(grammemes, o.grammemesCache)
-	o.cacheMu.Unlock()
-	return grammemes
+	return maps.Clone(o.grammemesCache)
 }
 
 // Return a new set of grammemes with “required“ grammemes added and incompatible grammemes removed.

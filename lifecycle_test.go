@@ -78,3 +78,20 @@ func TestConcurrentInflectIsRaceFree(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestGrammemesReturnsCopy(t *testing.T) {
+	morph, err := NewMorphAnalyzer("./opencorpora")
+	if err != nil {
+		t.Fatalf("load dictionary: %v", err)
+	}
+	tag := morph.Parse("дом")[0].Tag
+
+	grammemes := tag.grammemes()
+	if !grammemes["NOUN"] {
+		t.Fatalf("expected NOUN in %v", grammemes)
+	}
+	delete(grammemes, "NOUN")
+	if !tag.grammemes()["NOUN"] {
+		t.Fatal("changing a returned map must not change the cached grammemes")
+	}
+}
