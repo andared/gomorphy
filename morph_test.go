@@ -88,7 +88,6 @@ func TestDictionaryAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -449,7 +448,6 @@ func TestHyphenSeparatedParticleAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -588,7 +586,6 @@ func TestHyphenatedWordsAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -673,7 +670,6 @@ func TestKnownPrefixAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -768,7 +764,6 @@ func TestUnknownPrefixAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -863,7 +858,6 @@ func TestKnownSuffixAnalyzer(t *testing.T) {
 			t.Errorf("[%s] word: %#v - inflect is nil", aName, tc.word)
 			continue
 		}
-		tc.expInflect.Tag.grammemesCache = tc.expInflect.Tag.tags
 		if !parsesIsEqual(inf, &tc.expInflect) {
 			t.Errorf("[%s] word: %#v - inflect error", aName, tc.word)
 		}
@@ -994,7 +988,6 @@ func TestImmutableParse(t *testing.T) {
 		score:    parses[0].Score,
 		stack:    fmt.Sprintf("%v", parses[0].MethodsStack),
 	}
-	exceptedParse.tag.grammemesCache = parses[0].Tag.tags
 
 	parses[0].InflectVar("datv", "plur")
 
