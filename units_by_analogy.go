@@ -19,6 +19,7 @@ import (
 // and parsing the remainder.
 // Example: авиакошка -> (авиа) + кошка.
 type knownPrefixAnalyzer struct {
+	morph              *MorphAnalyzer
 	name               string
 	terminal           bool
 	scoreMultiplier    float32
@@ -28,8 +29,9 @@ type knownPrefixAnalyzer struct {
 }
 
 // значения по умолчанию scoreMultiplier=0.75, min_remainder_length=3
-func newKnownPrefixAnalyzer() *knownPrefixAnalyzer {
+func newKnownPrefixAnalyzer(morph *MorphAnalyzer) *knownPrefixAnalyzer {
 	anal := &knownPrefixAnalyzer{
+		morph:              morph,
 		name:               "KnownPrefixAnalyzer",
 		scoreMultiplier:    0.75,
 		minRemainderLength: 3,
@@ -54,7 +56,7 @@ func (self *knownPrefixAnalyzer) parse(word string, wordLower string, seenParses
 	for _, split := range self.possibleSplits(wordLower) {
 		method := Method{Analyzer: self, WordOrStack: split.prefix}
 
-		parses := morphAnalyzer.Parse(split.unprefixedWord)
+		parses := self.morph.Parse(split.unprefixedWord)
 		for _, p := range parses {
 			if !p.Tag.isProductive() {
 				continue
@@ -79,7 +81,7 @@ func (self *knownPrefixAnalyzer) parse(word string, wordLower string, seenParses
 func (self *knownPrefixAnalyzer) tag(word, wordLower string, seenTags map[string]bool) []*opencorporaTag {
 	result := []*opencorporaTag{}
 	for _, split := range self.possibleSplits(wordLower) {
-		for _, tag := range morphAnalyzer.Tag(split.unprefixedWord) {
+		for _, tag := range self.morph.Tag(split.unprefixedWord) {
 			if !tag.isProductive() {
 				continue
 			}
@@ -115,6 +117,7 @@ func (self *knownPrefixAnalyzer) possibleSplits(word string) []prefixWord {
 // Example: байткод -> (байт) + код
 
 type unknownPrefixAnalyzer struct {
+	morph           *MorphAnalyzer
 	name            string
 	terminal        bool
 	scoreMultiplier float32
@@ -122,8 +125,9 @@ type unknownPrefixAnalyzer struct {
 	*prefixMatcher
 }
 
-func newUnknownPrefixAnalyzer() *unknownPrefixAnalyzer {
+func newUnknownPrefixAnalyzer(morph *MorphAnalyzer) *unknownPrefixAnalyzer {
 	u := &unknownPrefixAnalyzer{
+		morph:           morph,
 		name:            "UnknownPrefixAnalyzer",
 		scoreMultiplier: 0.5,
 		terminal:        false,
@@ -146,8 +150,8 @@ func (self *unknownPrefixAnalyzer) parse(word, wordLower string, seenParses map[
 	for _, split := range wordSplits(wordLower) {
 		method := Method{Analyzer: self, WordOrStack: split.prefix}
 
-		// morphAnalyzer.analyzers[0] - DictionaryAnalyzer
-		parses := morphAnalyzer.analyzers[0].parse(split.unprefixedWord, split.unprefixedWord, seenParses)
+		// analyzers[0] — DictionaryAnalyzer
+		parses := self.morph.analyzers[0].parse(split.unprefixedWord, split.unprefixedWord, seenParses)
 		for _, p := range parses {
 			if !p.Tag.isProductive() {
 				continue
@@ -173,7 +177,7 @@ func (self *unknownPrefixAnalyzer) parse(word, wordLower string, seenParses map[
 func (self *unknownPrefixAnalyzer) tag(word, wordLower string, seenTags map[string]bool) []*opencorporaTag {
 	result := []*opencorporaTag{}
 	for _, split := range wordSplits(wordLower) {
-		tags := morphAnalyzer.words.tag(split.unprefixedWord, split.unprefixedWord, seenTags)
+		tags := self.morph.words.tag(split.unprefixedWord, split.unprefixedWord, seenTags)
 		for _, tag := range tags {
 			if !tag.isProductive() {
 				continue
@@ -197,6 +201,7 @@ type paradigmPrefix struct {
 // are parsed.
 // Example: бутявкать -> ...вкать
 type knownSuffixAnalyzer struct {
+	morph            *MorphAnalyzer
 	name             string
 	terminal         bool
 	minWordLength    int
@@ -208,8 +213,9 @@ type knownSuffixAnalyzer struct {
 }
 
 // значения по умолчанию scoreMultiplier=0.5,  minWordLength=4
-func newKnownSuffixAnalyzer(dawg *wordsDawg) *knownSuffixAnalyzer {
+func newKnownSuffixAnalyzer(morph *MorphAnalyzer, dawg *wordsDawg) *knownSuffixAnalyzer {
 	a := &knownSuffixAnalyzer{
+		morph:               morph,
 		name:                "KnownSuffixAnalyzer",
 		terminal:            true,
 		minWordLength:       4,
@@ -280,7 +286,7 @@ func (self *knownSuffixAnalyzer) parse(word string, wordLower string, seenParses
 				fixedWord := wordStart + fixedSuffix
 
 				for _, p := range parses {
-					tag := newOpencorporaTag(morphAnalyzer.words.dict.buildTagInfo(p.paraId, p.idx))
+					tag := newOpencorporaTag(self.morph.words.dict.buildTagInfo(p.paraId, p.idx))
 
 					// # skip non-productive tags
 					if !tag.isProductive() {
@@ -297,7 +303,7 @@ func (self *knownSuffixAnalyzer) parse(word string, wordLower string, seenParses
 					seenParses[reducedParse] = true
 
 					// # ok, build the result
-					normalForm := morphAnalyzer.words.dict.buildNormalForm(p, fixedWord)
+					normalForm := self.morph.words.dict.buildNormalForm(p, fixedWord)
 					methods := []Method{
 						{Analyzer: self.fakeDict, WordOrStack: fixedWord, ParaIdOrStack: p.paraId, Idx: p.idx},
 						{Analyzer: self, WordOrStack: fixedSuffix},
@@ -356,7 +362,7 @@ func (self *knownSuffixAnalyzer) tag(word, wordLower string, seenTags map[string
 			found := false
 			for _, para := range paraData {
 				for _, parse := range para.paradigms {
-					tag := newOpencorporaTag(morphAnalyzer.words.dict.buildTagInfo(parse.paraId, parse.idx))
+					tag := newOpencorporaTag(self.morph.words.dict.buildTagInfo(parse.paraId, parse.idx))
 					if !tag.isProductive() {
 						continue
 					}
@@ -405,7 +411,7 @@ func (self *knownSuffixAnalyzer) possiblePrefixes(word string) []prefixSuffix {
 		result = append(result, prefixSuffix{
 			prefixId:     p.prefixId,
 			prefix:       p.prefix,
-			suffixesDawg: morphAnalyzer.predSuffixes.predictSfxDawgs[p.prefixId],
+			suffixesDawg: self.morph.predSuffixes.predictSfxDawgs[p.prefixId],
 		})
 
 	}
